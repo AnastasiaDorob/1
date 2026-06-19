@@ -91,6 +91,10 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [rephrasingId, setRephrasingId] = useState<number | null>(null);
+  const [addingType, setAddingType] = useState<"technical" | "soft" | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selected = candidates.find((c) => c.id === selectedId) ?? null;
@@ -260,6 +264,90 @@ export default function HomePage() {
     }
   }
 
+  // Оновлює масив questions конкретного кандидата у стейті
+  function patchCandidateQuestions(
+    candidateId: string,
+    updater: (qs: Question[]) => Question[],
+  ) {
+    setCandidates((list) =>
+      list.map((c) =>
+        c.id === candidateId
+          ? { ...c, questions: updater(c.questions ?? []) }
+          : c,
+      ),
+    );
+  }
+
+  async function rephraseQuestion(candidate: Candidate, q: Question) {
+    if (rephrasingId !== null) return;
+    setRephrasingId(q.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/rephrase-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionText: q.text, level }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Помилка перефразування");
+
+      patchCandidateQuestions(candidate.id, (qs) =>
+        qs.map((item) =>
+          item.id === q.id
+            ? {
+                ...item,
+                text: typeof data.text === "string" ? data.text : item.text,
+                followUp:
+                  typeof data.followUp === "string"
+                    ? data.followUp
+                    : item.followUp,
+              }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Не вдалося перефразувати питання",
+      );
+    } finally {
+      setRephrasingId(null);
+    }
+  }
+
+  async function addQuestion(candidate: Candidate, type: "technical" | "soft") {
+    if (addingType !== null) return;
+    setAddingType(type);
+    setError(null);
+    try {
+      const res = await fetch("/api/add-custom-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateId: candidate.id,
+          candidateName: candidate.name,
+          jobText: candidate.jobText,
+          cvTextOrMarker: candidate.cvText,
+          type,
+          currentQuestionsCount: candidate.questions?.length ?? 0,
+          level,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Помилка додавання питання");
+
+      const added = data?.question as Question | undefined;
+      if (!added) throw new Error("Сервер не повернув питання");
+
+      patchCandidateQuestions(candidate.id, (qs) => [...qs, added]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Не вдалося додати питання",
+      );
+    } finally {
+      setAddingType(null);
+    }
+  }
+
   async function copyQuestion(q: Question) {
     try {
       await navigator.clipboard.writeText(q.text);
@@ -386,6 +474,10 @@ export default function HomePage() {
               candidate={selected}
               copiedId={copiedId}
               onCopy={copyQuestion}
+              rephrasingId={rephrasingId}
+              onRephrase={(q) => rephraseQuestion(selected, q)}
+              addingType={addingType}
+              onAdd={(type) => addQuestion(selected, type)}
               error={error}
             />
           ) : (
@@ -611,11 +703,19 @@ function CandidateDetail({
   candidate,
   copiedId,
   onCopy,
+  rephrasingId,
+  onRephrase,
+  addingType,
+  onAdd,
   error,
 }: {
   candidate: Candidate;
   copiedId: number | null;
   onCopy: (q: Question) => void;
+  rephrasingId: number | null;
+  onRephrase: (q: Question) => void;
+  addingType: "technical" | "soft" | null;
+  onAdd: (type: "technical" | "soft") => void;
   error: string | null;
 }) {
   const questions = candidate.questions ?? [];
@@ -671,12 +771,62 @@ function CandidateDetail({
                 index={i}
                 copied={copiedId === q.id}
                 onCopy={() => onCopy(q)}
+                rephrasing={rephrasingId === q.id}
+                onRephrase={() => onRephrase(q)}
               />
             ))}
           </ul>
         )}
+
+        {/* Додавання нових питань */}
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+          <AddQuestionButton
+            tone="technical"
+            loading={addingType === "technical"}
+            disabled={addingType !== null}
+            onClick={() => onAdd("technical")}
+          />
+          <AddQuestionButton
+            tone="soft"
+            loading={addingType === "soft"}
+            disabled={addingType !== null}
+            onClick={() => onAdd("soft")}
+          />
+        </div>
       </section>
     </div>
+  );
+}
+
+function AddQuestionButton({
+  tone,
+  loading,
+  disabled,
+  onClick,
+}: {
+  tone: "technical" | "soft";
+  loading: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const cls =
+    tone === "technical"
+      ? "border-violet-500/40 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20"
+      : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20";
+  const label =
+    tone === "technical"
+      ? "Додати Hard-skill питання"
+      : "Додати Soft-skill питання";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${cls}`}
+    >
+      {loading ? <MiniSpinner /> : <span className="text-base leading-none">➕</span>}
+      {label}
+    </button>
   );
 }
 
@@ -685,11 +835,15 @@ function QuestionCard({
   index,
   copied,
   onCopy,
+  rephrasing,
+  onRephrase,
 }: {
   question: Question;
   index: number;
   copied: boolean;
   onCopy: () => void;
+  rephrasing: boolean;
+  onRephrase: () => void;
 }) {
   return (
     <li
@@ -701,17 +855,32 @@ function QuestionCard({
           <span className="mt-0.5 text-xs font-medium text-white/30">
             {String(index + 1).padStart(2, "0")}
           </span>
-          <p className="text-sm leading-relaxed text-white/90">
+          <p
+            className={`text-sm leading-relaxed transition-opacity ${
+              rephrasing ? "text-white/40" : "text-white/90"
+            }`}
+          >
             {question.text}
           </p>
         </div>
-        <button
-          onClick={onCopy}
-          title="Скопіювати питання"
-          className="flex-shrink-0 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/70 transition-colors hover:border-white/30 hover:text-white"
-        >
-          {copied ? "Скопійовано ✓" : "Копіювати"}
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-1.5">
+          <button
+            onClick={onRephrase}
+            disabled={rephrasing}
+            title="Перефразувати питання"
+            className="flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/70 transition-colors hover:border-violet-400/50 hover:text-violet-200 disabled:opacity-60"
+          >
+            {rephrasing ? <MiniSpinner /> : <span>🔄</span>}
+            <span className="hidden sm:inline">Перефразувати</span>
+          </button>
+          <button
+            onClick={onCopy}
+            title="Скопіювати питання"
+            className="rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/70 transition-colors hover:border-white/30 hover:text-white"
+          >
+            {copied ? "Скопійовано ✓" : "Копіювати"}
+          </button>
+        </div>
       </div>
 
       <div className="mt-2 pl-8">
@@ -953,6 +1122,30 @@ function DocIcon({ className }: { className?: string }) {
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MiniSpinner() {
+  return (
+    <svg
+      className="h-3.5 w-3.5 animate-spin"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
       />
     </svg>
   );
