@@ -30,6 +30,9 @@ const SAMPLE_JOB = `Шукаємо Senior/Lead Frontend Engineer.
 Плюсом: досвід лідерства команди, code review, наставництво.
 Команда розподілена, потрібен сильний письмовий і усний English.`;
 
+// Закріплені кандидати зберігаємо в браузері (найпростіше, без змін схеми).
+const PIN_KEY = "aiwok:pinnedCandidateIds";
+
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -71,6 +74,7 @@ export default function HomePage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
 
   // selectedId === null → режим "Новий кандидат" (форма)
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -93,6 +97,62 @@ export default function HomePage() {
   const canSubmit = Boolean(
     candidateName.trim() && jobText.trim() && cvBase64 && !loading,
   );
+
+  // Розділяємо на закріплені та решту (порядок усередині — як прийшло з сервера, новіші перші)
+  const pinnedSet = new Set(pinnedIds);
+  const pinnedCandidates = candidates.filter((c) => pinnedSet.has(c.id));
+  const otherCandidates = candidates.filter((c) => !pinnedSet.has(c.id));
+
+  function persistPins(ids: string[]) {
+    setPinnedIds(ids);
+    try {
+      localStorage.setItem(PIN_KEY, JSON.stringify(ids));
+    } catch {
+      // ignore
+    }
+  }
+
+  function togglePin(id: string) {
+    persistPins(
+      pinnedIds.includes(id)
+        ? pinnedIds.filter((x) => x !== id)
+        : [id, ...pinnedIds],
+    );
+  }
+
+  function selectCandidate(id: string) {
+    setSelectedId(id);
+    setError(null);
+  }
+
+  async function deleteCandidate(id: string) {
+    const prev = candidates;
+    // Оптимістично прибираємо зі списку
+    setCandidates((list) => list.filter((c) => c.id !== id));
+    if (pinnedIds.includes(id)) persistPins(pinnedIds.filter((x) => x !== id));
+    if (selectedId === id) startNew();
+
+    try {
+      const res = await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setCandidates(prev); // відкат
+      setError("Не вдалося видалити кандидата. Спробуйте ще раз.");
+    }
+  }
+
+  // Завантажуємо закріплених із localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PIN_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setPinnedIds(parsed.filter((x) => typeof x === "string"));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Завантажуємо історію при старті
   useEffect(() => {
@@ -228,11 +288,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        <div className="px-4 pb-1 pt-1 text-xs font-medium uppercase tracking-wide text-white/30">
-          Історія
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
+        <div className="flex-1 overflow-y-auto px-2 pb-3 pt-1">
           {listLoading ? (
             <div className="space-y-2 px-1 py-2">
               {[0, 1, 2].map((i) => (
@@ -249,32 +305,45 @@ export default function HomePage() {
               Ще немає кандидатів. Створіть першого 👆
             </p>
           ) : (
-            <ul className="space-y-1">
-              {candidates.map((c) => (
-                <li key={c.id}>
-                  <button
-                    onClick={() => {
-                      setSelectedId(c.id);
-                      setError(null);
-                    }}
-                    className={`w-full rounded-lg px-3 py-2.5 text-left transition-colors ${
-                      selectedId === c.id
-                        ? "bg-white/10"
-                        : "hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <p className="truncate text-sm font-medium text-white/90">
-                      {c.name}
-                    </p>
-                    <p className="flex items-center gap-1.5 text-xs text-white/40">
-                      <span>{formatDate(c.createdAt)}</span>
-                      <span>·</span>
-                      <span>{c.questions?.length ?? 0} пит.</span>
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-3">
+              {pinnedCandidates.length > 0 && (
+                <div>
+                  <SidebarLabel>📌 Закріплені</SidebarLabel>
+                  <ul className="space-y-1">
+                    {pinnedCandidates.map((c) => (
+                      <CandidateRow
+                        key={c.id}
+                        candidate={c}
+                        active={selectedId === c.id}
+                        pinned
+                        onSelect={() => selectCandidate(c.id)}
+                        onTogglePin={() => togglePin(c.id)}
+                        onDelete={() => deleteCandidate(c.id)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div>
+                {pinnedCandidates.length > 0 && (
+                  <SidebarLabel>Історія</SidebarLabel>
+                )}
+                <ul className="space-y-1">
+                  {otherCandidates.map((c) => (
+                    <CandidateRow
+                      key={c.id}
+                      candidate={c}
+                      active={selectedId === c.id}
+                      pinned={false}
+                      onSelect={() => selectCandidate(c.id)}
+                      onTogglePin={() => togglePin(c.id)}
+                      onDelete={() => deleteCandidate(c.id)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            </div>
           )}
         </div>
       </aside>
@@ -685,6 +754,125 @@ function ErrorAlert({ message }: { message: string }) {
         <p className="text-red-200/80">{message}</p>
       </div>
     </div>
+  );
+}
+
+function SidebarLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-2 pb-1 pt-1 text-xs font-medium uppercase tracking-wide text-white/30">
+      {children}
+    </div>
+  );
+}
+
+function CandidateRow({
+  candidate,
+  active,
+  pinned,
+  onSelect,
+  onTogglePin,
+  onDelete,
+}: {
+  candidate: Candidate;
+  active: boolean;
+  pinned: boolean;
+  onSelect: () => void;
+  onTogglePin: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <li className="group relative">
+      <button
+        onClick={onSelect}
+        className={`w-full rounded-lg px-3 py-2.5 pr-16 text-left transition-colors ${
+          active ? "bg-white/10" : "hover:bg-white/[0.06]"
+        }`}
+      >
+        <p className="truncate text-sm font-medium text-white/90">
+          {candidate.name}
+        </p>
+        <p className="flex items-center gap-1.5 text-xs text-white/40">
+          <span>{formatDate(candidate.createdAt)}</span>
+          <span>·</span>
+          <span>{candidate.questions?.length ?? 0} пит.</span>
+        </p>
+      </button>
+
+      {/* Кнопки-дії: pinned завжди видно, решта — на hover */}
+      <div
+        className={`absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 transition-opacity ${
+          pinned
+            ? "opacity-100"
+            : "opacity-0 focus-within:opacity-100 group-hover:opacity-100"
+        }`}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
+          title={pinned ? "Відкріпити" : "Закріпити"}
+          className={`rounded-md p-1.5 transition-colors hover:bg-white/10 ${
+            pinned ? "text-amber-300" : "text-white/50 hover:text-white"
+          }`}
+        >
+          <PinIcon className="h-3.5 w-3.5" filled={pinned} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          title="Видалити"
+          className="rounded-md p-1.5 text-white/50 transition-colors hover:bg-red-500/15 hover:text-red-300"
+        >
+          <TrashIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function PinIcon({
+  className,
+  filled,
+}: {
+  className?: string;
+  filled?: boolean;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
   );
 }
 
