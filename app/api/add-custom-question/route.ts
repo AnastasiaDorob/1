@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
       ? `Поле "followUp" може бути порожнім рядком.`
       : `Додай корисний "followUp" — навідне підпитання для інтерв'юера.`;
 
-  const system = `Ти — досвідчений IT-рекрутер. Згенеруй РІВНО ОДНЕ нове питання для співбесіди типу "${type}" — ${typeLabel}. Пиши простою, живою людською мовою під цю вакансію та кандидата. ${followUpRule}
+  const system = `Ти — досвідчений IT-рекрутер. Згенеруй РІВНО 3 нових питання для співбесіди типу "${type}" — ${typeLabel}. Пиши простою, живою людською мовою під цю вакансію та кандидата. ${followUpRule}
 
-ВАЖЛИВО: питання має бути УНІКАЛЬНИМ і НЕ повторювати (навіть за змістом) наведені наявні питання.
+ВАЖЛИВО: усі 3 питання мають бути УНІКАЛЬНИМИ — не повторювати (навіть за змістом) одне одного та наведені наявні питання.
 
-Поверни результат СУВОРО у форматі JSON, без пояснень і без markdown-обгортки:
-{ "text": "питання", "type": "${type}", "followUp": "навідне підпитання або порожній рядок" }`;
+Поверни результат СУВОРО у форматі JSON-масиву з рівно 3 елементами, без пояснень і без markdown-обгортки:
+{ "questions": [ { "text": "питання", "type": "${type}", "followUp": "навідне підпитання або порожній рядок" }, { "text": "питання", "type": "${type}", "followUp": "..." }, { "text": "питання", "type": "${type}", "followUp": "..." } ] }`;
 
   const userContent = `Кандидат: ${candidateName || "—"}
 Резюме (довідково): ${cvTextOrMarker || "—"}
@@ -102,11 +102,11 @@ ${jobText || "—"}
 Наявні питання (НЕ повторюй їх):
 ${existingTexts.length ? existingTexts.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(поки немає)"}`;
 
-  let question: Question;
+  let newQuestions: Question[];
   try {
     const message = await anthropic.messages.create({
       model: AI_MODEL,
-      max_tokens: 800,
+      max_tokens: 1500,
       system,
       messages: [{ role: "user", content: userContent }],
     });
@@ -115,20 +115,28 @@ ${existingTexts.length ? existingTexts.map((t, i) => `${i + 1}. ${t}`).join("\n"
       .map((b) => (b.type === "text" ? b.text : ""))
       .join("\n");
 
-    const parsed = JSON.parse(extractJson(rawText)) as {
-      text?: unknown;
-      type?: unknown;
-      followUp?: unknown;
-    };
-    if (typeof parsed.text !== "string" || !parsed.text.trim()) {
-      throw new Error("no text");
+    const parsed = JSON.parse(extractJson(rawText)) as { questions?: unknown };
+    if (!parsed || !Array.isArray(parsed.questions)) {
+      throw new Error("Очікувався об'єкт виду { questions: [...] }");
     }
-    question = {
-      id: nextId,
-      text: parsed.text,
-      type: parsed.type === "soft" || parsed.type === "technical" ? parsed.type : type,
-      followUp: typeof parsed.followUp === "string" ? parsed.followUp : "",
-    };
+
+    newQuestions = parsed.questions
+      .map((q: unknown) => {
+        const item = (q ?? {}) as Record<string, unknown>;
+        return {
+          text: typeof item.text === "string" ? item.text.trim() : "",
+          type:
+            item.type === "soft" || item.type === "technical"
+              ? item.type
+              : type,
+          followUp: typeof item.followUp === "string" ? item.followUp : "",
+        };
+      })
+      .filter((q) => q.text)
+      .slice(0, 3)
+      .map((q, i) => ({ ...q, id: nextId + i }));
+
+    if (newQuestions.length === 0) throw new Error("no questions");
   } catch (err) {
     console.error("add-custom-question: AI/parse error", err);
     return Response.json(
@@ -137,14 +145,14 @@ ${existingTexts.length ? existingTexts.map((t, i) => `${i + 1}. ${t}`).join("\n"
     );
   }
 
-  // Дописуємо в БД
+  // Дописуємо всі нові питання в БД
   try {
-    const updated = [...existing, question];
+    const updated = [...existing, ...newQuestions];
     await prisma.candidate.update({
       where: { id: candidate.id },
       data: { questions: updated },
     });
-    return Response.json({ question });
+    return Response.json({ questions: newQuestions });
   } catch (err) {
     console.error("add-custom-question: DB error", err);
     return Response.json(

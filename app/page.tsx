@@ -335,10 +335,12 @@ export default function HomePage() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Помилка додавання питання");
 
-      const added = data?.question as Question | undefined;
-      if (!added) throw new Error("Сервер не повернув питання");
+      const added = Array.isArray(data?.questions)
+        ? (data.questions as Question[])
+        : [];
+      if (added.length === 0) throw new Error("Сервер не повернув питання");
 
-      patchCandidateQuestions(candidate.id, (qs) => [...qs, added]);
+      patchCandidateQuestions(candidate.id, (qs) => [...qs, ...added]);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Не вдалося додати питання",
@@ -815,8 +817,8 @@ function AddQuestionButton({
       : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20";
   const label =
     tone === "technical"
-      ? "Додати Hard-skill питання"
-      : "Додати Soft-skill питання";
+      ? "Згенерувати 3 технічних питання"
+      : "Згенерувати 3 софтових питання";
   return (
     <button
       type="button"
