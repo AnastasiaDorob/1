@@ -38,32 +38,6 @@ type GeneratedResult = {
   questions: GeneratedQuestion[];
 };
 
-// Дістаємо id поточного користувача. Якщо сесія ще не налаштована —
-// тимчасово використовуємо тестового користувача (за ТЗ).
-async function resolveUserId(): Promise<string> {
-  try {
-    const session = await auth();
-    const email = session?.user?.email;
-    if (email) {
-      const user = await prisma.user.upsert({
-        where: { email },
-        update: {},
-        create: { email, name: session.user?.name ?? null },
-      });
-      return user.id;
-    }
-  } catch {
-    // auth ще не налаштований (немає AUTH_SECRET тощо) — падаємо на тестового користувача
-  }
-
-  const testUser = await prisma.user.upsert({
-    where: { email: "test@example.com" },
-    update: {},
-    create: { email: "test@example.com", name: "Test User" },
-  });
-  return testUser.id;
-}
-
 // Витягуємо текст із відповіді Claude і парсимо JSON (з підстраховкою на ```json-обгортку).
 function parseQuestions(rawText: string): GeneratedResult {
   let text = rawText.trim();
@@ -95,10 +69,16 @@ function parseQuestions(rawText: string): GeneratedResult {
   return { questions };
 }
 
-// GET — історія всіх збережених кандидатів, найновіші перші.
+// GET — історія кандидатів ПОТОЧНОГО користувача, найновіші перші.
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const candidates = await prisma.candidate.findMany({
+      where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -120,6 +100,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return Response.json(
       { error: "ANTHROPIC_API_KEY не налаштовано на сервері." },
@@ -207,9 +193,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // --- 3. Збереження в БД через Prisma ---
+  // --- 3. Збереження в БД через Prisma (прив'язка до поточного користувача) ---
   try {
-    const userId = await resolveUserId();
     const candidate = await prisma.candidate.create({
       data: {
         userId,

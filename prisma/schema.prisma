@@ -16,6 +16,7 @@ model User {
   id            String      @id @default(cuid())
   name          String?
   email         String?     @unique
+  password      String? // bcrypt-хеш; для входу за email+password
   emailVerified DateTime?
   image         String?
   createdAt     DateTime    @default(now())

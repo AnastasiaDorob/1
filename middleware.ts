@@ -1,16 +1,14 @@
-// Місце під захист маршрутів авторизацією.
-//
-// Розкоментуй, щоб закрити /chat (та інші) для неавторизованих:
-//
-// export { auth as middleware } from "@/lib/auth";
-//
-// export const config = {
-//   matcher: ["/chat/:path*"],
-// };
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth.config";
 
-// Поки що middleware ні на що не впливає — заглушка, щоб структура була на місці.
-export function middleware() {}
+// Edge-інстанс лише з authConfig (без Prisma/bcrypt) — читає JWT і
+// застосовує callbacks.authorized: неавторизованих кидає на /login.
+const { auth } = NextAuth(authConfig);
+
+export default auth;
 
 export const config = {
-  matcher: [],
+  // Захищаємо всі сторінки, окрім /api/*, статики та файлів із крапкою.
+  // API-маршрути захищають себе самі (повертають 401).
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

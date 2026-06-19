@@ -1,12 +1,47 @@
 import NextAuth from "next-auth";
-import GitHub from "next-auth/providers/github";
+import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { authConfig } from "@/lib/auth.config";
+import { prisma } from "@/lib/prisma";
 
-// Місце під авторизацію (Auth.js / NextAuth v5).
-//
-// Запрацює, щойно у .env будуть AUTH_SECRET + AUTH_GITHUB_ID/SECRET.
-// Провайдери легко міняти: Google, Credentials, Email-magic-link тощо.
-// Без env-змінних білд проходить — падіння буде лише при реальній спробі логіну.
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: [GitHub],
-  // pages: { signIn: "/login" }, // якщо хочеш свою сторінку логіну
+// Повна конфігурація Auth.js (Node runtime: використовує Prisma + bcrypt).
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Пароль", type: "password" },
+      },
+      authorize: async (credentials) => {
+        const email = (credentials?.email as string | undefined)
+          ?.trim()
+          .toLowerCase();
+        const password = credentials?.password as string | undefined;
+        if (!email || !password) return null;
+
+        const existing = await prisma.user.findUnique({ where: { email } });
+
+        if (existing) {
+          // Акаунт без пароля (legacy) — вхід за паролем заборонено
+          if (!existing.password) return null;
+          const ok = await bcrypt.compare(password, existing.password);
+          if (!ok) return null;
+          return {
+            id: existing.id,
+            email: existing.email,
+            name: existing.name,
+          };
+        }
+
+        // Автореєстрація під час першого входу
+        if (password.length < 6) return null; // мінімальна довжина пароля
+        const hash = await bcrypt.hash(password, 10);
+        const created = await prisma.user.create({
+          data: { email, password: hash, name: email.split("@")[0] },
+        });
+        return { id: created.id, email: created.email, name: created.name };
+      },
+    }),
+  ],
 });
