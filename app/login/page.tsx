@@ -2,7 +2,7 @@ import { signIn } from "@/lib/auth";
 
 export default function LoginPage() {
   return (
-    <div className="max-w-sm mx-auto space-y-6">
+    <div className="max-w-sm mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Вхід</h1>
       <p className="text-sm text-white/60">
         Заготовка авторизації на Auth.js. Запрацює, щойно у{" "}

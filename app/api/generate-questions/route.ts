@@ -6,8 +6,19 @@ import { auth } from "@/lib/auth";
 // Anthropic SDK + Prisma потребують Node.js runtime (не Edge).
 export const runtime = "nodejs";
 
-// Системний промт згідно з ТЗ. Просимо суворо JSON заданої форми.
-const SYSTEM_PROMPT = `Ти досвідчений IT-рекрутер. Твоє завдання — порівняти резюме кандидата та вакансію, знайти невідповідності або зони для перевірки та згенерувати 5-7 точкових, глибоких питань для технічного або софт-скіл інтерв'ю. Поверни результат суворо у форматі JSON: об'єкт із масивом об'єктів { questions: [ { id: 1, text: "питання", type: "technical/soft" } ] }`;
+// Системний промт. Глибокі питання + навідні підпитання (followUp) у строгому JSON.
+const SYSTEM_PROMPT = `Ти — досвідчений IT-рекрутер і інтерв'юер. Порівняй резюме кандидата (надане PDF-документом) з описом вакансії, знайди невідповідності, ризики та зони, які варто перевірити на співбесіді. Згенеруй 5-7 глибоких, точкових питань.
+
+Вимоги до питань:
+- Пиши простою, живою, людською мовою — так, ніби ставиш питання вживу, без канцеляриту й шаблонів.
+- Використовуй просунуті техніки оцінки:
+  • Поведінкові питання за методикою STAR/PARLA — проси згадати конкретну ситуацію з реального досвіду (контекст, завдання, дії, результат, висновки).
+  • Ситуаційні кейси, змодельовані саме під цю вакансію — гіпотетична робоча ситуація, яку кандидат розв'язує вголос.
+- Для КОЖНОГО питання додай поле "followUp" — навідне підпитання або підказку рекрутеру, що уточнити чи копнути глибше залежно від відповіді кандидата.
+- Поле "type" — "technical" (хард-скіли, технології, архітектура) або "soft" (комунікація, лідерство, поведінка).
+
+Поверни результат СУВОРО у форматі JSON, без пояснень і без markdown-обгортки:
+{ "questions": [ { "id": 1, "text": "питання", "type": "technical", "followUp": "навідне підпитання для рекрутера" } ] }`;
 
 type GenerateQuestionsBody = {
   cvBase64?: unknown;
@@ -20,6 +31,7 @@ type GeneratedQuestion = {
   id: number;
   text: string;
   type: string;
+  followUp: string;
 };
 
 type GeneratedResult = {
@@ -62,11 +74,49 @@ function parseQuestions(rawText: string): GeneratedResult {
     text = fenceMatch[1].trim();
   }
 
-  const parsed = JSON.parse(text) as GeneratedResult;
+  const parsed = JSON.parse(text) as { questions?: unknown };
   if (!parsed || !Array.isArray(parsed.questions)) {
     throw new Error("Очікувався об'єкт виду { questions: [...] }");
   }
-  return parsed;
+
+  // Нормалізуємо кожне питання, гарантуючи наявність усіх полів (followUp обов'язкове).
+  const questions: GeneratedQuestion[] = parsed.questions.map(
+    (q: unknown, i: number) => {
+      const item = (q ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof item.id === "number" ? item.id : i + 1,
+        text: typeof item.text === "string" ? item.text : "",
+        type: typeof item.type === "string" ? item.type : "technical",
+        followUp: typeof item.followUp === "string" ? item.followUp : "",
+      };
+    },
+  );
+
+  return { questions };
+}
+
+// GET — історія всіх збережених кандидатів, найновіші перші.
+export async function GET() {
+  try {
+    const candidates = await prisma.candidate.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        cvText: true,
+        jobText: true,
+        questions: true,
+        createdAt: true,
+      },
+    });
+    return Response.json({ candidates });
+  } catch (err) {
+    console.error("generate-questions GET: DB error", err);
+    return Response.json(
+      { error: "Не вдалося завантажити історію кандидатів." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -120,7 +170,7 @@ export async function POST(req: NextRequest) {
   try {
     const message = await anthropic.messages.create({
       model: AI_MODEL,
-      max_tokens: 2048,
+      max_tokens: 3000,
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -169,13 +219,18 @@ export async function POST(req: NextRequest) {
         jobText,
         questions: result.questions,
       },
+      select: {
+        id: true,
+        name: true,
+        cvText: true,
+        jobText: true,
+        questions: true,
+        createdAt: true,
+      },
     });
 
-    // --- 4. Повертаємо результат на фронтенд ---
-    return Response.json({
-      candidateId: candidate.id,
-      questions: result.questions,
-    });
+    // --- 4. Повертаємо повний об'єкт кандидата (щоб фронт додав його в історію) ---
+    return Response.json({ candidate });
   } catch (err) {
     console.error("generate-questions: DB error", err);
     return Response.json(
