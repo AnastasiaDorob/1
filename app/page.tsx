@@ -78,6 +78,7 @@ export default function HomePage() {
   // --- Стан форми ---
   const [candidateName, setCandidateName] = useState("");
   const [jobText, setJobText] = useState("");
+  const [level, setLevel] = useState<"easy" | "advanced">("easy");
   const [cvFileName, setCvFileName] = useState<string | null>(null);
   const [cvSize, setCvSize] = useState<number | null>(null);
   const [cvBase64, setCvBase64] = useState<string | null>(null);
@@ -173,7 +174,13 @@ export default function HomePage() {
       const res = await fetch("/api/generate-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidateName, jobText, cvBase64, cvFileName }),
+        body: JSON.stringify({
+          candidateName,
+          jobText,
+          cvBase64,
+          cvFileName,
+          level,
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -290,6 +297,8 @@ export default function HomePage() {
               setCandidateName={setCandidateName}
               jobText={jobText}
               setJobText={setJobText}
+              level={level}
+              setLevel={setLevel}
               cvFileName={cvFileName}
               cvSize={cvSize}
               dragOver={dragOver}
@@ -326,6 +335,8 @@ function NewCandidateView(props: {
   setCandidateName: (v: string) => void;
   jobText: string;
   setJobText: (v: string) => void;
+  level: "easy" | "advanced";
+  setLevel: (v: "easy" | "advanced") => void;
   cvFileName: string | null;
   cvSize: number | null;
   dragOver: boolean;
@@ -344,6 +355,8 @@ function NewCandidateView(props: {
     setCandidateName,
     jobText,
     setJobText,
+    level,
+    setLevel,
     cvFileName,
     cvSize,
     dragOver,
@@ -475,6 +488,29 @@ function NewCandidateView(props: {
               rows={9}
               disabled={loading}
               className="h-[188px] w-full resize-y rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-white/30 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+            />
+          </div>
+        </div>
+
+        {/* Перемикач рівня складності */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-white/80">
+            Рівень складності
+          </label>
+          <div className="grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/20 p-1 sm:grid-cols-2">
+            <LevelOption
+              active={level === "easy"}
+              disabled={loading}
+              onClick={() => setLevel("easy")}
+              title="Легкий (Скринінг)"
+              desc="Прості класичні питання — ідеально для першої розмови та нетехнічних ролей"
+            />
+            <LevelOption
+              active={level === "advanced"}
+              disabled={loading}
+              onClick={() => setLevel("advanced")}
+              title="Просунутий (STAR / Кейси)"
+              desc="Глибокі поведінкові питання та мікро-сценарії під вакансію"
             />
           </div>
         </div>
@@ -649,6 +685,46 @@ function ErrorAlert({ message }: { message: string }) {
         <p className="text-red-200/80">{message}</p>
       </div>
     </div>
+  );
+}
+
+function LevelOption({
+  active,
+  disabled,
+  onClick,
+  title,
+  desc,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={`rounded-lg border px-3.5 py-3 text-left transition-colors disabled:opacity-50 ${
+        active
+          ? "border-violet-400/50 bg-violet-500/15"
+          : "border-transparent hover:bg-white/[0.04]"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
+            active ? "border-violet-300" : "border-white/30"
+          }`}
+        >
+          {active && <span className="h-2 w-2 rounded-full bg-violet-300" />}
+        </span>
+        <span className="text-sm font-medium text-white/90">{title}</span>
+      </div>
+      <p className="mt-1 pl-6 text-xs leading-relaxed text-white/50">{desc}</p>
+    </button>
   );
 }
 

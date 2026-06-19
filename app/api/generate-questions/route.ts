@@ -6,25 +6,36 @@ import { auth } from "@/lib/auth";
 // Anthropic SDK + Prisma потребують Node.js runtime (не Edge).
 export const runtime = "nodejs";
 
-// Системний промт. Глибокі питання + навідні підпитання (followUp) у строгому JSON.
-const SYSTEM_PROMPT = `Ти — досвідчений IT-рекрутер і інтерв'юер. Порівняй резюме кандидата (надане PDF-документом) з описом вакансії, знайди невідповідності, ризики та зони, які варто перевірити на співбесіді. Згенеруй 5-7 глибоких, точкових питань.
+// Спільний хвіст із вимогою строгого JSON-формату.
+const JSON_FORMAT_INSTRUCTION = `
+
+Поверни результат СУВОРО у форматі JSON, без пояснень і без markdown-обгортки:
+{ "questions": [ { "id": 1, "text": "питання", "type": "technical", "followUp": "навідне підпитання або порожній рядок" } ] }
+Поле "type" — "technical" або "soft".`;
+
+// Просунутий режим: STAR/PARLA + ситуаційні кейси, з детальними follow-up.
+const ADVANCED_PROMPT = `Ти — досвідчений IT-рекрутер і інтерв'юер. Порівняй резюме кандидата (надане PDF-документом) з описом вакансії, знайди невідповідності, ризики та зони, які варто перевірити на співбесіді. Згенеруй 5-7 глибоких, точкових питань.
 
 Вимоги до питань:
 - Пиши простою, живою, людською мовою — так, ніби ставиш питання вживу, без канцеляриту й шаблонів.
 - Використовуй просунуті техніки оцінки:
   • Поведінкові питання за методикою STAR/PARLA — проси згадати конкретну ситуацію з реального досвіду (контекст, завдання, дії, результат, висновки).
   • Ситуаційні кейси, змодельовані саме під цю вакансію — гіпотетична робоча ситуація, яку кандидат розв'язує вголос.
-- Для КОЖНОГО питання додай поле "followUp" — навідне підпитання або підказку рекрутеру, що уточнити чи копнути глибше залежно від відповіді кандидата.
-- Поле "type" — "technical" (хард-скіли, технології, архітектура) або "soft" (комунікація, лідерство, поведінка).
+- Для КОЖНОГО питання додай поле "followUp" — навідне підпитання або підказку рекрутеру, що уточнити чи копнути глибше залежно від відповіді кандидата.${JSON_FORMAT_INSTRUCTION}`;
 
-Поверни результат СУВОРО у форматі JSON, без пояснень і без markdown-обгортки:
-{ "questions": [ { "id": 1, "text": "питання", "type": "technical", "followUp": "навідне підпитання для рекрутера" } ] }`;
+// Легкий режим: первинний скринінг, прості питання, підходять і для нетехнічних ролей.
+const EASY_PROMPT = `Ти досвідчений IT HR-generalist. Твоє завдання — згенерувати 5-7 ПРОСТИХ, класичних питань для первинного скринінгу простою людською мовою. Пройдися по загальному досвіду кандидата, логіці його кар'єрного шляху та базовій відповідності основним вимогам вакансії. Питання мають підходити як для технічних, так і для нетехнічних ролей (менеджери, дизайнери тощо) і не бути занадто глибокими чи душними. Блок "followUp" у JSON може бути порожнім рядком.${JSON_FORMAT_INSTRUCTION}`;
+
+function systemPromptFor(level: "easy" | "advanced"): string {
+  return level === "easy" ? EASY_PROMPT : ADVANCED_PROMPT;
+}
 
 type GenerateQuestionsBody = {
   cvBase64?: unknown;
   cvFileName?: unknown;
   jobText?: unknown;
   candidateName?: unknown;
+  level?: unknown;
 };
 
 type GeneratedQuestion = {
@@ -118,6 +129,7 @@ export async function POST(req: NextRequest) {
   let cvFileName: string;
   let jobText: string;
   let candidateName: string;
+  let level: "easy" | "advanced" = "advanced";
   try {
     const body = (await req.json()) as GenerateQuestionsBody;
     if (
@@ -141,6 +153,7 @@ export async function POST(req: NextRequest) {
         : "resume.pdf";
     jobText = body.jobText;
     candidateName = body.candidateName;
+    level = body.level === "easy" ? "easy" : "advanced";
   } catch {
     return Response.json(
       {
@@ -157,7 +170,7 @@ export async function POST(req: NextRequest) {
     const message = await anthropic.messages.create({
       model: AI_MODEL,
       max_tokens: 3000,
-      system: SYSTEM_PROMPT,
+      system: systemPromptFor(level),
       messages: [
         {
           role: "user",
