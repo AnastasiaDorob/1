@@ -1,0 +1,40 @@
+// Prisma schema для AI wok
+// Документація: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Користувач. Поля сумісні з Auth.js (NextAuth) Prisma-адаптером,
+// тож пізніше @auth/prisma-adapter підключиться без міграції структури.
+model User {
+  id            String      @id @default(cuid())
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  candidates    Candidate[]
+}
+
+// Кандидат: збережені резюме (CV), вакансія та згенеровані питання.
+model Candidate {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  cvText    String   @db.Text // повний текст резюме
+  jobText   String   @db.Text // повний текст вакансії
+  questions Json     // згенеровані питання (масив об'єктів / структурований JSON)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
