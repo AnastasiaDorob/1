@@ -1,0 +1,31 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# env — НІКОЛИ не комітимо ключі
+.env
+.env*.local
+
+# debug / misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.pem
+
+# typescript
+next-env.d.ts
+.tsbuildinfo
+
+# editor / IDE
+.vscode/
+.idea/
+
+# claude code — локальні особисті налаштування
+.claude/settings.local.json
