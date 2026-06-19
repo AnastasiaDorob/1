@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
+import { BrandLogo } from "@/components/Logo";
 
 export async function Header() {
   const session = await auth();
@@ -8,8 +9,8 @@ export async function Header() {
   return (
     <header className="border-b border-white/10">
       <nav className="flex h-14 w-full items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="font-semibold tracking-tight">
-          🍳 AI Wok
+        <Link href="/" aria-label="HireIQ — на головну">
+          <BrandLogo />
         </Link>
 
         {user ? (

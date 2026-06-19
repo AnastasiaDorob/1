@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { BrandMark } from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,15 +45,17 @@ export default function LoginPage() {
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
       >
-        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-violet-600/20 blur-[100px]" />
-        <div className="absolute bottom-0 right-1/4 h-72 w-72 rounded-full bg-emerald-500/10 blur-[100px]" />
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-amber-400/15 blur-[100px]" />
+        <div className="absolute bottom-0 right-1/4 h-72 w-72 rounded-full bg-amber-500/10 blur-[100px]" />
       </div>
 
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="mb-3 text-3xl">🍳</div>
-          <h1 className="bg-gradient-to-br from-white to-white/50 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
-            Вхід до кабінету рекрутера
+          <div className="mb-4 flex justify-center">
+            <BrandMark className="h-10 w-10 text-amber-400" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Вхід до <span className="text-amber-400">HireIQ</span>
           </h1>
           <p className="mt-1.5 text-sm text-white/50">
             Увійдіть, щоб бачити своїх кандидатів
@@ -74,7 +77,7 @@ export default function LoginPage() {
               placeholder="recruiter@company.com"
               autoComplete="email"
               disabled={loading}
-              className="w-full rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-white/30 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50"
+              className="w-full rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-white/30 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20 disabled:opacity-50"
             />
           </div>
 
@@ -89,7 +92,7 @@ export default function LoginPage() {
               placeholder="••••••••"
               autoComplete="current-password"
               disabled={loading}
-              className="w-full rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-white/30 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50"
+              className="w-full rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-white/30 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20 disabled:opacity-50"
             />
           </div>
 
@@ -102,7 +105,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || !email.trim() || !password}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-900/30 transition-all hover:from-violet-500 hover:to-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
               <svg

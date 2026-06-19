@@ -369,7 +369,7 @@ export default function HomePage() {
             onClick={startNew}
             className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
               selectedId === null
-                ? "border-violet-400/50 bg-violet-500/15 text-white"
+                ? "border-amber-400/50 bg-amber-400/15 text-white"
                 : "border-white/10 bg-white/[0.03] text-white/80 hover:border-white/25"
             }`}
           >
@@ -445,7 +445,7 @@ export default function HomePage() {
           aria-hidden
           className="pointer-events-none absolute inset-0 overflow-hidden"
         >
-          <div className="absolute -top-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-violet-600/15 blur-[100px]" />
+          <div className="absolute -top-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-amber-400/15 blur-[100px]" />
           <div className="absolute top-40 right-0 h-72 w-72 rounded-full bg-emerald-500/10 blur-[100px]" />
         </div>
 
@@ -561,7 +561,7 @@ function NewCandidateView(props: {
           <button
             type="button"
             onClick={onFillExample}
-            className="text-xs text-violet-300/80 underline-offset-2 hover:text-violet-200 hover:underline"
+            className="text-xs text-amber-300/80 underline-offset-2 hover:text-amber-200 hover:underline"
           >
             Підставити приклад
           </button>
@@ -572,7 +572,7 @@ function NewCandidateView(props: {
           onChange={(e) => setCandidateName(e.target.value)}
           placeholder="Напр., Олена Коваленко"
           disabled={loading}
-          className="-mt-2 w-full rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-white/30 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50"
+          className="-mt-2 w-full rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-white/30 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20 disabled:opacity-50"
         />
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -591,8 +591,8 @@ function NewCandidateView(props: {
             />
 
             {cvFileName ? (
-              <div className="flex items-center gap-3 rounded-lg border border-violet-400/40 bg-violet-500/10 p-3.5">
-                <DocIcon className="h-8 w-8 flex-shrink-0 text-violet-300" />
+              <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3.5">
+                <DocIcon className="h-8 w-8 flex-shrink-0 text-amber-300" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white/90">
                     {cvFileName}
@@ -626,14 +626,14 @@ function NewCandidateView(props: {
                 }}
                 className={`flex min-h-[188px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors ${
                   dragOver
-                    ? "border-violet-400/70 bg-violet-500/10"
+                    ? "border-amber-400/70 bg-amber-400/10"
                     : "border-white/20 bg-black/20 hover:border-white/40"
                 }`}
               >
                 <DocIcon className="h-9 w-9 text-white/40" />
                 <p className="text-sm text-white/70">
                   Перетягніть PDF сюди або{" "}
-                  <span className="text-violet-300">оберіть файл</span>
+                  <span className="text-amber-300">оберіть файл</span>
                 </p>
                 <p className="text-xs text-white/30">Тільки .pdf</p>
               </div>
@@ -650,7 +650,7 @@ function NewCandidateView(props: {
               placeholder="Встав сюди вимоги вакансії — обов'язкові навички, стек, рівень, soft skills…"
               rows={9}
               disabled={loading}
-              className="h-[188px] w-full resize-y rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-white/30 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+              className="h-[188px] w-full resize-y rounded-lg border border-white/15 bg-black/20 px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-white/30 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20 disabled:opacity-50"
             />
           </div>
         </div>
@@ -681,7 +681,7 @@ function NewCandidateView(props: {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-900/30 transition-all hover:from-violet-500 hover:to-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-amber-400 px-5 py-3 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? (
             <>
@@ -734,7 +734,7 @@ function CandidateDetail({
           </span>
         </div>
         <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
-          <DocIcon className="h-5 w-5 text-violet-300" />
+          <DocIcon className="h-5 w-5 text-amber-300" />
           <span className="text-white/80">
             {pdfNameFromCvText(candidate.cvText)}
           </span>
@@ -870,7 +870,7 @@ function QuestionCard({
             onClick={onRephrase}
             disabled={rephrasing}
             title="Перефразувати питання"
-            className="flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/70 transition-colors hover:border-violet-400/50 hover:text-violet-200 disabled:opacity-60"
+            className="flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/70 transition-colors hover:border-amber-400/50 hover:text-amber-200 disabled:opacity-60"
           >
             {rephrasing ? <MiniSpinner /> : <span>🔄</span>}
             <span className="hidden sm:inline">Перефразувати</span>
@@ -1068,17 +1068,17 @@ function LevelOption({
       aria-pressed={active}
       className={`rounded-lg border px-3.5 py-3 text-left transition-colors disabled:opacity-50 ${
         active
-          ? "border-violet-400/50 bg-violet-500/15"
+          ? "border-amber-400/50 bg-amber-400/15"
           : "border-transparent hover:bg-white/[0.04]"
       }`}
     >
       <div className="flex items-center gap-2">
         <span
           className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
-            active ? "border-violet-300" : "border-white/30"
+            active ? "border-amber-300" : "border-white/30"
           }`}
         >
-          {active && <span className="h-2 w-2 rounded-full bg-violet-300" />}
+          {active && <span className="h-2 w-2 rounded-full bg-amber-300" />}
         </span>
         <span className="text-sm font-medium text-white/90">{title}</span>
       </div>
@@ -1156,7 +1156,7 @@ function MiniSpinner() {
 function Spinner() {
   return (
     <svg
-      className="h-4 w-4 animate-spin text-white"
+      className="h-4 w-4 animate-spin"
       viewBox="0 0 24 24"
       fill="none"
     >

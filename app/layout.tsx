@@ -3,8 +3,9 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
-  title: "AI Wok",
-  description: "Next.js + Vercel стартер з серверним AI-проксі та авторизацією",
+  title: "HireIQ — Професійна AI-платформа для інтерв'ю",
+  description:
+    "Автоматичний аналіз PDF-резюме та генерація точкових питань за методологіями STAR та скринінгу на базі Claude API",
 };
 
 export default function RootLayout({
